@@ -6,38 +6,40 @@ import joblib
 import numpy as np
 import pandas as pd
 import sqlite3
+import os
 from datetime import datetime
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
+# ===================== APP =====================
 app = Flask(__name__)
-app.secret_key = "change_this_secret_key_later"
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")
 
-
-# -------------------- MODEL LOADING --------------------
-model = joblib.load("ml_model/performance_model.joblib")
-label_encoder = joblib.load("ml_model/label_encoder.joblib")
-
-# -------------------- DB HELPER --------------------
-import os
-
+# ===================== PATHS (🔥 FIXED) =====================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "database", "student_system.db")
+DB_DIR = os.path.join(BASE_DIR, "database")
+DB_PATH = os.path.join(DB_DIR, "student_system.db")
 
+MODEL_PATH = os.path.join(BASE_DIR, "ml_model", "performance_model.joblib")
+ENCODER_PATH = os.path.join(BASE_DIR, "ml_model", "label_encoder.joblib")
+
+# ===================== MODEL LOADING =====================
+model = joblib.load(MODEL_PATH)
+label_encoder = joblib.load(ENCODER_PATH)
+
+# ===================== DB HELPERS =====================
 def get_db_connection():
-    os.makedirs(DB_DIR, exist_ok=True)  # ✅ MUST exist before sqlite opens
+    os.makedirs(DB_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-
 def init_db_and_admin():
     conn = get_db_connection()
 
-    # USERS
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +50,6 @@ def init_db_and_admin():
         )
     """)
 
-    # STUDENTS
     conn.execute("""
         CREATE TABLE IF NOT EXISTS students (
             roll_no INTEGER PRIMARY KEY,
@@ -62,7 +63,6 @@ def init_db_and_admin():
         )
     """)
 
-    # PREDICTION HISTORY
     conn.execute("""
         CREATE TABLE IF NOT EXISTS prediction_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,8 +71,6 @@ def init_db_and_admin():
             date_time TEXT
         )
     """)
-
-    from werkzeug.security import generate_password_hash
 
     admin = conn.execute(
         "SELECT * FROM users WHERE username='admin'"
@@ -90,7 +88,6 @@ def init_db_and_admin():
 
     conn.commit()
     conn.close()
-
 
 # -------------------- RISK & RECOMMENDATION --------------------
 def get_risk_and_recommendation(student):
@@ -833,29 +830,7 @@ def admin_upload_csv():
     except Exception as e:
         return f"CSV Upload Error: {e}"
 
-@app.route("/init-admin")
-def init_admin():
-    from werkzeug.security import generate_password_hash
-
-    conn = get_db_connection()
-    try:
-        conn.execute("""
-            INSERT INTO users (username, password, role)
-            VALUES (?, ?, ?)
-        """, (
-            "admin",
-            generate_password_hash("admin123"),
-            "admin"
-        ))
-        conn.commit()
-        return "Admin created successfully!"
-    except Exception as e:
-        return f"Error: {e}"
-    finally:
-        conn.close()
-
-init_db_and_admin()
-
 if __name__ == "__main__":
+    init_db_and_admin()
     app.run(host="0.0.0.0", port=5000)
 
