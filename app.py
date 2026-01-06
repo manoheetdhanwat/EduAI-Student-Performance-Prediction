@@ -26,14 +26,13 @@ label_encoder = joblib.load("ml_model/label_encoder.joblib")
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_DIR = os.path.join(BASE_DIR, "database")
-DB_PATH = os.path.join(DB_DIR, "student_system.db")
+DB_PATH = os.path.join(BASE_DIR, "database", "student_system.db")
 
 def get_db_connection():
-    os.makedirs(DB_DIR, exist_ok=True)  # 🔥 CRITICAL FIX
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
 
 def init_db_and_admin():
     conn = get_db_connection()
@@ -810,6 +809,27 @@ def admin_upload_csv():
 
     except Exception as e:
         return f"CSV Upload Error: {e}"
+
+@app.route("/init-admin")
+def init_admin():
+    from werkzeug.security import generate_password_hash
+
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            INSERT INTO users (username, password, role)
+            VALUES (?, ?, ?)
+        """, (
+            "admin",
+            generate_password_hash("admin123"),
+            "admin"
+        ))
+        conn.commit()
+        return "Admin created successfully!"
+    except Exception as e:
+        return f"Error: {e}"
+    finally:
+        conn.close()
 
 init_db_and_admin()
 
