@@ -14,17 +14,68 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
 app = Flask(__name__)
-app.secret_key = "change_this_secret_key_later"  # change for production
+import os
+app.secret_key = os.environ.get("SECRET_KEY", "eduai-dev-secret")
+  # change for production
 
 # -------------------- MODEL LOADING --------------------
 model = joblib.load("ml_model/performance_model.joblib")
 label_encoder = joblib.load("ml_model/label_encoder.joblib")
 
 # -------------------- DB HELPER --------------------
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_DIR = os.path.join(BASE_DIR, "database")
+DB_PATH = os.path.join(DB_DIR, "student_system.db")
+
 def get_db_connection():
-    conn = sqlite3.connect("database/student_system.db")
+    os.makedirs(DB_DIR, exist_ok=True)  # 🔥 CRITICAL FIX
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+def init_db():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT,
+            role TEXT,
+            roll_no INTEGER
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            roll_no INTEGER PRIMARY KEY,
+            name TEXT,
+            attendance REAL,
+            assignments_score REAL,
+            midterm_score REAL,
+            final_score REAL,
+            study_hours REAL,
+            performance TEXT
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS prediction_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            roll_no INTEGER,
+            predicted_label TEXT,
+            date_time TEXT
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+init_db()
+
 
 # -------------------- RISK & RECOMMENDATION --------------------
 def get_risk_and_recommendation(student):
