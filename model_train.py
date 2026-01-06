@@ -17,10 +17,6 @@ df = df[df["performance"].astype(str).str.strip() != ""]
 # Normalize labels
 df["performance"] = df["performance"].str.strip().str.title()
 
-# Merge sparse class (industry-standard)
-df["performance"] = df["performance"].replace({
-    "Excellent": "Good"
-})
 
 print("Class distribution:\n", df["performance"].value_counts())
 
