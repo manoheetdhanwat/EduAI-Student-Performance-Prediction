@@ -17,8 +17,6 @@ app = Flask(__name__)
 app.secret_key = "change_this_secret_key_later"
 
 
-init_db_and_admin()
-
 
 # -------------------- MODEL LOADING --------------------
 model = joblib.load("ml_model/performance_model.joblib")
@@ -70,6 +68,8 @@ def init_db_and_admin():
         conn.commit()
 
     conn.close()
+# ✅ initialize database and default admin
+init_db_and_admin()
 
 
 # -------------------- RISK & RECOMMENDATION --------------------
