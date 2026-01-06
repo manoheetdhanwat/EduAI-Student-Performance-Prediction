@@ -36,6 +36,8 @@ def get_db_connection():
     return conn
 
 def init_db_and_admin():
+    # Initialize database and admin user (only once)
+    init_db_and_admin()
     conn = get_db_connection()
 
     # Create users table
@@ -68,8 +70,6 @@ def init_db_and_admin():
         conn.commit()
 
     conn.close()
-# ✅ initialize database and default admin
-init_db_and_admin()
 
 
 # -------------------- RISK & RECOMMENDATION --------------------
