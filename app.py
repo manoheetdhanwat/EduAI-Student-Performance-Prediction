@@ -14,9 +14,11 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
 app = Flask(__name__)
-import os
-app.secret_key = os.environ.get("SECRET_KEY", "eduai-dev-secret")
-  # change for production
+app.secret_key = "change_this_secret_key_later"
+
+
+init_db_and_admin()
+
 
 # -------------------- MODEL LOADING --------------------
 model = joblib.load("ml_model/performance_model.joblib")
@@ -35,11 +37,11 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_db():
+def init_db_and_admin():
     conn = get_db_connection()
-    cur = conn.cursor()
 
-    cur.execute("""
+    # Create users table
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
@@ -49,32 +51,25 @@ def init_db():
         )
     """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS students (
-            roll_no INTEGER PRIMARY KEY,
-            name TEXT,
-            attendance REAL,
-            assignments_score REAL,
-            midterm_score REAL,
-            final_score REAL,
-            study_hours REAL,
-            performance TEXT
-        )
-    """)
+    from werkzeug.security import generate_password_hash
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS prediction_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            roll_no INTEGER,
-            predicted_label TEXT,
-            date_time TEXT
-        )
-    """)
+    # Create default admin
+    admin = conn.execute(
+        "SELECT * FROM users WHERE username = 'admin'"
+    ).fetchone()
 
-    conn.commit()
+    if not admin:
+        conn.execute("""
+            INSERT INTO users (username, password, role)
+            VALUES (?, ?, ?)
+        """, (
+            "admin",
+            generate_password_hash("admin123"),
+            "admin"
+        ))
+        conn.commit()
+
     conn.close()
-
-init_db()
 
 
 # -------------------- RISK & RECOMMENDATION --------------------
