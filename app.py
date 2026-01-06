@@ -37,7 +37,7 @@ def get_db_connection():
 def init_db_and_admin():
     conn = get_db_connection()
 
-    # Create users table
+    # USERS
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,11 +48,34 @@ def init_db_and_admin():
         )
     """)
 
+    # STUDENTS
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS students (
+            roll_no INTEGER PRIMARY KEY,
+            name TEXT,
+            attendance REAL,
+            assignments_score REAL,
+            midterm_score REAL,
+            final_score REAL,
+            study_hours REAL,
+            performance TEXT
+        )
+    """)
+
+    # PREDICTION HISTORY
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS prediction_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            roll_no INTEGER,
+            predicted_label TEXT,
+            date_time TEXT
+        )
+    """)
+
     from werkzeug.security import generate_password_hash
 
-    # Create default admin
     admin = conn.execute(
-        "SELECT * FROM users WHERE username = 'admin'"
+        "SELECT * FROM users WHERE username='admin'"
     ).fetchone()
 
     if not admin:
@@ -64,8 +87,8 @@ def init_db_and_admin():
             generate_password_hash("admin123"),
             "admin"
         ))
-        conn.commit()
 
+    conn.commit()
     conn.close()
 
 
