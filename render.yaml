@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: eduai-student-performance
-    env: python
-    plan: free
-    pythonVersion: 3.10.13
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
