@@ -36,8 +36,6 @@ def get_db_connection():
     return conn
 
 def init_db_and_admin():
-    # Initialize database and admin user (only once)
-    init_db_and_admin()
     conn = get_db_connection()
 
     # Create users table
@@ -813,6 +811,7 @@ def admin_upload_csv():
     except Exception as e:
         return f"CSV Upload Error: {e}"
 
+init_db_and_admin()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
