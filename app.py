@@ -14,7 +14,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 
 app = Flask(__name__)
-app.secret_key = "change_this_secret_key_later"
+app.secret_key = os.environ.get("SECRET_KEY", "eduai-dev-secret")
 
 
 
