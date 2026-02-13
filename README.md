@@ -121,11 +121,6 @@ EduAI-Student-Performance-Prediction/
 │
 └── .gitignore
 
-yaml
-Copy code
-
----
-
 ## ⚙️ Installation & Setup
 
 ### 1️⃣ Clone the Repository
