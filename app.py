@@ -6,6 +6,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import sqlite3
+import requests
 import os
 from datetime import datetime
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -17,6 +18,14 @@ from reportlab.lib import colors
 # ===================== APP =====================
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret")
+
+@app.after_request
+def add_header(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 
 # ===================== PATHS (🔥 FIXED) =====================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -118,41 +127,120 @@ def get_risk_and_recommendation(student):
 
     return risk, " ".join(rec)
 
-# -------------------- SIMPLE CHATBOT LOGIC --------------------
+# --------------------  CHATBOT  --------------------
 def chatbot_reply(message: str) -> str:
-    msg = message.lower()
+    try:
+        msg = message.strip().lower()
 
-    if any(word in msg for word in ["hello", "hi", "hey"]):
-        return "Hi! 👋 I’m your AI assistant for the Student Performance System. Ask me about attendance, marks, risk level, or how to improve your studies."
+        # ---------------------------------
+        # Casual Short Responses
+        # ---------------------------------
+        casual_responses = {
+            "hi": "Hello! How can I help you today?",
+            "hello": "Hi there! What would you like help with?",
+            "hey": "Hey! What can I assist you with?",
+            "ok": "Alright 👍",
+            "okay": "Sure 👍 Let me know if you need anything.",
+            "thanks": "You're welcome! 😊",
+            "thank you": "You're welcome!",
+            "no": "Alright. Let me know whenever you need help.",
+            "nothing": "Okay 👍 I'm here if you need anything."
+        }
 
-    if "attendance" in msg:
-        return "Attendance is very important. Try to keep it above 75%. If your attendance is low, focus on attending all classes for the next few weeks and avoid unnecessary absences."
+        if msg in casual_responses:
+            return casual_responses[msg]
 
-    if "study" in msg or "hours" in msg or "time table" in msg:
-        return "A good habit is to study 2–3 hours daily in focused blocks. Break it as: 45 minutes study + 10 minutes break. Prioritize weak subjects first and revise with short notes."
+        # ---------------------------------
+        # Role-Based System Prompt
+        # ---------------------------------
+        user_role = session.get("role")
 
-    if "exam" in msg or "exams" in msg or "test" in msg:
-        return "For exams, revise previous question papers, focus on important units, and solve 3–5 problems per topic. The night before the exam, do light revision and sleep well."
+        if user_role == "teacher":
+            system_prompt = """
+You are EduAI assisting a TEACHER.
 
-    if "improve marks" in msg or "low marks" in msg or "fail" in msg:
-        return "Check which area is weak: attendance, assignments, or exam preparation. Start by analysing your mistakes, practicing similar questions, and asking doubts from teachers or peers."
+You help with:
+- Attendance issues
+- Weak or at-risk students
+- Classroom improvement
+- Academic interventions
 
-    if "gpa" in msg or "grade" in msg:
-        return "To improve GPA/grades, be consistent: submit assignments on time, attend classes, and maintain daily revision. Small improvements in each subject add up to a better GPA."
+Rules:
+- Speak directly to the teacher.
+- Do NOT give student self-study advice.
+- Do NOT explain what you are doing.
+- Use structured bullet points for strategies.
+- Keep responses professional and practical.
+"""
+        else:
+            system_prompt = """
+You are EduAI assisting a STUDENT.
 
-    if "risk" in msg or "at risk" in msg:
-        return "The system marks you as 'High', 'Medium', or 'Low' risk based on attendance, performance, and study hours. If you’re High risk, increase study time, attend all classes, and seek help from teachers."
+You help with:
+- Improving GPA
+- Exam preparation
+- Study techniques
+- Attendance improvement
 
-    if "project" in msg or "system" in msg or "explain" in msg:
-        return "This system predicts student performance using machine learning, shows at-risk students to teachers, provides dashboards, history, and AI-generated recommendations and PDF reports."
+Rules:
+- Speak directly to the student.
+- Do NOT give classroom management advice.
+- Do NOT explain what you are doing.
+- Use simple bullet points for tips.
+- Keep responses clear and practical.
+"""
 
-    if "recommendation" in msg or "suggest" in msg:
-        return "General recommendation: make a realistic timetable, focus on weak subjects, revise daily, take mock tests on weekends, and discuss doubts early instead of waiting till exams."
+        # ---------------------------------
+        # Memory Control + Topic Reset
+        # ---------------------------------
+        history = session.get("chat_history", [])
 
-    if "who are you" in msg or "what can you do" in msg:
-        return "I’m a simple AI chatbot inside the Student Performance Prediction and Recommendation System. I help with guidance on study, performance, and how to use this platform."
+        reset_keywords = ["my name", "who am i", "college", "university", "sandip"]
 
-    return "I’m not fully sure about that, but you can ask me about attendance, study plans, exams, risk levels, GPA, or how to improve your academic performance."
+        if any(word in msg for word in reset_keywords):
+            history = []
+
+        conversation = ""
+
+        for item in history[-4:]:  # small memory window for stability
+            if item["sender"] == "user":
+                conversation += f"User: {item['text']}\n"
+            else:
+                conversation += f"Assistant: {item['text']}\n"
+
+        conversation += f"User: {message}\nAssistant:"
+
+        # ---------------------------------
+        # Call Ollama (Gemma)
+        # ---------------------------------
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "gemma:2b",
+                "prompt": f"{system_prompt}\n\n{conversation}",
+                "stream": False
+            },
+            timeout=60
+        )
+
+        result = response.json()
+        raw_text = result.get("response", "").strip()
+
+        cleaned = (
+            raw_text
+            .replace("EduAI:", "")
+            .replace("Sure, here's the assistant's reply:", "")
+            .replace("Here is the assistant's reply:", "")
+            .replace("**", "")
+            .replace("##", "")
+            .strip()
+        )
+
+        return cleaned if cleaned else "Could you please clarify your question?"
+
+    except Exception:
+        return "AI service unavailable. Please ensure Ollama is running."
+
 
 # -------------------- AUTH HELPERS --------------------
 def get_user_by_username(username):
@@ -179,6 +267,8 @@ def home():
 # ---------- LOGIN / LOGOUT ----------
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    session.clear()
+
     error = None
     if request.method == "POST":
         role = request.form["role"]
@@ -190,6 +280,7 @@ def login():
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             session["role"] = user["role"]
+            session["chat_history"] = []
 
             if role == "admin":
                 return redirect(url_for("admin_dashboard"))
@@ -617,18 +708,21 @@ def student_report(roll_no):
     return send_file(buffer, as_attachment=True, download_name=filename, mimetype="application/pdf")
 
 # ---------- CHATBOT ROUTE ----------
+
 @app.route("/chatbot", methods=["GET", "POST"])
 def chatbot():
-    # optional: allow both logged-in teacher & student or even guests
     history = session.get("chat_history", [])
 
     if request.method == "POST":
         user_msg = request.form.get("message", "").strip()
+
         if user_msg:
             bot_msg = chatbot_reply(user_msg)
+
             history.append({"sender": "user", "text": user_msg})
             history.append({"sender": "bot", "text": bot_msg})
-            session["chat_history"] = history
+
+            session["chat_history"] = history[-8:]
 
     return render_template("chatbot.html", history=history)
 

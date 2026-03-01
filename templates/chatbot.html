@@ -62,7 +62,10 @@
         <h3 class="text-lg font-bold">EduAI Assistant</h3>
       </div>
     </div>
-    <a href="javascript:history.back()" class="text-sm text-blue-600 hover:underline">← Dashboard</a>
+    <button onclick="goDashboard()" class="text-sm text-blue-600 hover:underline">
+  ← Dashboard
+</button>
+
   </div>
 
   <!-- MESSAGES -->
@@ -80,9 +83,10 @@
           {{ m.text }}
         </div>
       {% else %}
-        <div class="max-w-lg bubble-bot px-5 py-4 rounded-3xl animate-slide-left">
-          {{ m.text }}
-        </div>
+        <div class="max-w-lg bubble-bot px-5 py-4 rounded-3xl animate-slide-left whitespace-pre-wrap leading-relaxed">
+  {{ m.text }}
+</div>
+
       {% endif %}
     {% endfor %}
 
@@ -130,6 +134,12 @@
 
   const chat = document.getElementById('chat');
   chat.scrollTop = chat.scrollHeight;
+</script>
+
+<script>
+  function goDashboard() {
+      window.location.replace("/dashboard");
+  }
 </script>
 
 </body>
